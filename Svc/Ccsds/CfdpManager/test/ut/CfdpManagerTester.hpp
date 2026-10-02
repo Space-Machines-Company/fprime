@@ -556,6 +556,7 @@ class CfdpManagerTester final : public CfdpManagerGTestBase {
     // RX Error Events
     void testRxFileCreateFailedEvent();
     void testRxCrcMismatchEvent();
+    void testClass1RxCrcMismatchRemovesFile();
     void testRxFileSizeMismatchEvent();
     void testRxFileDataOutOfBoundsEvent();
     void testRxEofCancelReceivedEvent();
