@@ -7,6 +7,8 @@
 
 #include "CfdpManagerTester.hpp"
 
+#include <Os/FileSystem.hpp>
+
 namespace Svc {
 namespace Ccsds {
 namespace Cfdp {
@@ -177,6 +179,61 @@ void CfdpManagerTester::testParamFileInDefaultPrioritySetGet() {
     Fw::ParamValid valid;
     ASSERT_EQ(newValue, this->component.paramGet_FileInDefaultPriority(valid));
     ASSERT_EQ(Fw::ParamValid::VALID, valid.e);
+}
+
+// ---- SequenceFile ----
+
+namespace {
+const char* const SEQUENCE_PATH = "CfdpManagerSequenceFileUt.txt";
+const char* const UNWRITABLE_SEQUENCE_PATH = "/nonexistent-cfdp-directory/sequence";
+}  // namespace
+
+void CfdpManagerTester::useSequenceFile(const char* path) {
+    this->paramSet_SequenceFile(Fw::ParamString(path), Fw::ParamValid::VALID);
+    this->paramSend_SequenceFile(0, 0);
+}
+
+void CfdpManagerTester::testParamSequenceFileEmptyNumbersFromOne() {
+    ASSERT_EQ(1u, this->component.m_engine->nextSequence());
+    ASSERT_EQ(2u, this->component.m_engine->nextSequence());
+    ASSERT_EVENTS_SequenceFileUnavailable_SIZE(0);
+}
+
+void CfdpManagerTester::testParamSequenceFileSurvivesARestart() {
+    (void)Os::FileSystem::removeFile(SEQUENCE_PATH);
+    this->useSequenceFile(SEQUENCE_PATH);
+    const TransactionSeq first = this->component.m_engine->nextSequence();
+    ASSERT_EQ(static_cast<TransactionSeq>(first + 1), this->component.m_engine->nextSequence());
+
+    CfdpManagerTester rebooted;
+    rebooted.useSequenceFile(SEQUENCE_PATH);
+    ASSERT_EQ(static_cast<TransactionSeq>(first + Engine::SequenceBlock), rebooted.component.m_engine->nextSequence())
+        << "A restart must not reuse a number from the block reserved before it";
+    ASSERT_EVENTS_SequenceFileUnavailable_SIZE(0);
+    (void)Os::FileSystem::removeFile(SEQUENCE_PATH);
+}
+
+void CfdpManagerTester::testParamSequenceFileReservesTheNextBlock() {
+    (void)Os::FileSystem::removeFile(SEQUENCE_PATH);
+    this->useSequenceFile(SEQUENCE_PATH);
+    const TransactionSeq first = this->component.m_engine->nextSequence();
+    for (TransactionSeq offset = 1; offset <= Engine::SequenceBlock; ++offset) {
+        ASSERT_EQ(static_cast<TransactionSeq>(first + offset), this->component.m_engine->nextSequence());
+    }
+
+    CfdpManagerTester rebooted;
+    rebooted.useSequenceFile(SEQUENCE_PATH);
+    ASSERT_EQ(static_cast<TransactionSeq>(first + 2 * Engine::SequenceBlock),
+              rebooted.component.m_engine->nextSequence())
+        << "Crossing a block must reserve the next one before using it";
+    (void)Os::FileSystem::removeFile(SEQUENCE_PATH);
+}
+
+void CfdpManagerTester::testParamSequenceFileUnwritableWarnsAndStillNumbers() {
+    this->useSequenceFile(UNWRITABLE_SEQUENCE_PATH);
+    const TransactionSeq first = this->component.m_engine->nextSequence();
+    ASSERT_EQ(static_cast<TransactionSeq>(first + 1), this->component.m_engine->nextSequence());
+    ASSERT_EVENTS_SequenceFileUnavailable_SIZE(1);
 }
 
 }  // namespace Cfdp

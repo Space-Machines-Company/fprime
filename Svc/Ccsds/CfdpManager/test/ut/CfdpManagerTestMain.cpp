@@ -302,6 +302,26 @@ TEST(Parameter, FileInDefaultPriorityDefault) {
     tester.testParamFileInDefaultPriorityDefault();
 }
 
+TEST(Parameter, SequenceFileEmptyNumbersFromOne) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testParamSequenceFileEmptyNumbersFromOne();
+}
+
+TEST(Parameter, SequenceFileSurvivesARestart) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testParamSequenceFileSurvivesARestart();
+}
+
+TEST(Parameter, SequenceFileReservesTheNextBlock) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testParamSequenceFileReservesTheNextBlock();
+}
+
+TEST(Parameter, SequenceFileUnwritableWarnsAndStillNumbers) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testParamSequenceFileUnwritableWarnsAndStillNumbers();
+}
+
 TEST(Port, DataReturnInChannel0) {
     Svc::Ccsds::Cfdp::CfdpManagerTester tester;
     tester.testDataReturnInChannel0();

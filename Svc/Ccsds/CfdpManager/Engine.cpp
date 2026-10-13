@@ -775,7 +775,7 @@ TransactionSeq randomSequence() {
     return static_cast<TransactionSeq>(device());
 }
 
-}
+}  // namespace
 
 TransactionSeq Engine::nextSequence() {
     if (!this->m_seqReserved || static_cast<TransactionSeq>(this->m_seqNum + 1) == this->m_seqLimit) {

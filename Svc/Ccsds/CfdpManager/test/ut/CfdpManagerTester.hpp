@@ -507,6 +507,21 @@ class CfdpManagerTester final : public CfdpManagerGTestBase {
     //! Test FileInDefaultPriority parameter default value
     void testParamFileInDefaultPriorityDefault();
 
+    //! Test an empty SequenceFile numbers transactions from 1
+    void testParamSequenceFileEmptyNumbersFromOne();
+
+    //! Test a restart continues after the block reserved in SequenceFile
+    void testParamSequenceFileSurvivesARestart();
+
+    //! Test crossing a block reserves the next one in SequenceFile
+    void testParamSequenceFileReservesTheNextBlock();
+
+    //! Test an unwritable SequenceFile warns once and still numbers consecutively
+    void testParamSequenceFileUnwritableWarnsAndStillNumbers();
+
+    //! Point the SequenceFile parameter at a path
+    void useSequenceFile(const char* path);
+
   public:
     // ----------------------------------------------------------------------
     // Port Tests
