@@ -439,6 +439,8 @@ class CfdpManager final : public CfdpManagerComponentBase {
     //! \return The local CFDP entity ID
     EntityId getLocalEidParam(void);
 
+    Fw::ParamString getSequenceFileParam(void);
+
     //! Get the outgoing file chunk size parameter
     //!
     //! \return Maximum size in bytes for file data segments in outgoing PDUs

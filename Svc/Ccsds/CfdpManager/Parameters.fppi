@@ -61,3 +61,7 @@ param ChannelConfig: Cfdp.ChannelArrayParams \
             fail_dir = "/fail" \
         } \
     ]
+
+@ File keeping the next transaction sequence number across restarts; empty keeps none
+param SequenceFile: string size Cfdp.MaxFilePathSize \
+    default ""

@@ -606,3 +606,10 @@ event TxLateFinAcked(
 ) \
     severity diagnostic \
     format "Acknowledged late FIN for transaction {}:{}"
+
+@ The sequence file could not be written; transaction numbers start from a random value
+event SequenceFileUnavailable(
+    path: string size Cfdp.MaxFilePathSize @< The SequenceFile parameter
+) \
+    severity warning low \
+    format "Cannot keep transaction numbers in {}; starting from a random value"

@@ -511,6 +511,10 @@ class Engine {
      */
     void txFileInitiate(Transaction* txn, Class::T cfdp_class, Keep::T keep, U8 chan, U8 priority, EntityId dest_id);
 
+    TransactionSeq nextSequence();
+
+    void reserveSequenceBlock();
+
     /**
      * @brief Initiate playback of a directory
      *
@@ -565,6 +569,12 @@ class Engine {
 
     //! Sequence number tracker for outgoing transactions
     TransactionSeq m_seqNum;
+
+    static constexpr TransactionSeq SequenceBlock = 256;
+
+    TransactionSeq m_seqLimit;
+
+    bool m_seqReserved;
 
     //! Memory allocator for Channel cleanup
     Fw::MemAllocator* m_allocator;

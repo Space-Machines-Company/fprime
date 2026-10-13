@@ -592,6 +592,12 @@ EntityId CfdpManager::getLocalEidParam(void) {
     return localEid;
 }
 
+Fw::ParamString CfdpManager::getSequenceFileParam(void) {
+    Fw::ParamValid valid;
+    Fw::ParamString path = this->paramGet_SequenceFile(valid);
+    return FW_PARAM_OK(valid) ? path : Fw::ParamString("");
+}
+
 U32 CfdpManager::getOutgoingFileChunkSizeParam(void) {
     Fw::ParamValid valid;
 

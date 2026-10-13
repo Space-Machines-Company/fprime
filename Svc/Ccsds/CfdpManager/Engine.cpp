@@ -37,7 +37,13 @@
 // ======================================================================
 
 #include <string.h>
+#include <cstdio>
+#include <cstdlib>
 #include <new>
+#include <random>
+
+#include <Os/File.hpp>
+#include <Os/FileSystem.hpp>
 
 #include <Fw/Types/StringUtils.hpp>
 #include <Os/FileSystem.hpp>
@@ -57,7 +63,8 @@ namespace Cfdp {
 // Construction and destruction
 // ----------------------------------------------------------------------
 
-Engine::Engine(CfdpManager* manager) : m_manager(manager), m_seqNum(0), m_allocator(nullptr), m_allocatorId(0) {
+Engine::Engine(CfdpManager* manager)
+    : m_manager(manager), m_seqNum(0), m_seqLimit(0), m_seqReserved(false), m_allocator(nullptr), m_allocatorId(0) {
     for (U8 i = 0; i < Cfdp::NumChannels; ++i) {
         m_channels[i] = nullptr;
     }
@@ -724,6 +731,76 @@ Status::T Engine::abandonTransaction(U8 channelId, TransactionSeq transactionSeq
     return status;
 }
 
+namespace {
+
+bool readSequence(const char* path, TransactionSeq& value) {
+    Os::File file;
+    if (file.open(path, Os::File::OPEN_READ, Os::File::NO_OVERWRITE) != Os::File::OP_OK) {
+        return false;
+    }
+    char text[16] = {};
+    FwSizeType size = sizeof(text) - 1;
+    const bool read = file.read(reinterpret_cast<U8*>(text), size, Os::File::WAIT) == Os::File::OP_OK;
+    file.close();
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(text, &end, 10);
+    if (!read || end == text) {
+        return false;
+    }
+    value = static_cast<TransactionSeq>(parsed);
+    return true;
+}
+
+bool writeSequence(const char* path, TransactionSeq value) {
+    char temporary[Cfdp::MaxFilePathSize + 8];
+    const int pathLength = std::snprintf(temporary, sizeof(temporary), "%s.tmp", path);
+    if (pathLength < 0 || static_cast<FwSizeType>(pathLength) >= sizeof(temporary)) {
+        return false;
+    }
+    char text[16];
+    const int length = std::snprintf(text, sizeof(text), "%lu\n", static_cast<unsigned long>(value));
+    Os::File file;
+    if (file.open(temporary, Os::File::OPEN_CREATE, Os::File::OVERWRITE) != Os::File::OP_OK) {
+        return false;
+    }
+    FwSizeType size = static_cast<FwSizeType>(length);
+    const bool written = file.write(reinterpret_cast<const U8*>(text), size, Os::File::WAIT) == Os::File::OP_OK &&
+                         file.flush() == Os::File::OP_OK;
+    file.close();
+    return written && Os::FileSystem::moveFile(temporary, path) == Os::FileSystem::OP_OK;
+}
+
+TransactionSeq randomSequence() {
+    std::random_device device;
+    return static_cast<TransactionSeq>(device());
+}
+
+}
+
+TransactionSeq Engine::nextSequence() {
+    if (!this->m_seqReserved || static_cast<TransactionSeq>(this->m_seqNum + 1) == this->m_seqLimit) {
+        this->reserveSequenceBlock();
+    }
+    return ++this->m_seqNum;
+}
+
+void Engine::reserveSequenceBlock() {
+    const Fw::ParamString path = this->m_manager->getSequenceFileParam();
+    TransactionSeq start = this->m_seqReserved ? this->m_seqLimit : 1;
+    if (path.length() > 0) {
+        if (!this->m_seqReserved && !readSequence(path.toChar(), start)) {
+            start = randomSequence();
+        }
+        if (!writeSequence(path.toChar(), static_cast<TransactionSeq>(start + SequenceBlock))) {
+            this->m_manager->log_WARNING_LO_SequenceFileUnavailable(path);
+            start = randomSequence();
+        }
+    }
+    this->m_seqNum = static_cast<TransactionSeq>(start - 1);
+    this->m_seqLimit = static_cast<TransactionSeq>(start + SequenceBlock);
+    this->m_seqReserved = true;
+}
+
 void Engine::txFileInitiate(Transaction* txn,
                             Class::T cfdp_class,
                             Keep::T keep,
@@ -732,11 +809,8 @@ void Engine::txFileInitiate(Transaction* txn,
                             EntityId dest_id) {
     txn->initTxFile(cfdp_class, keep, chan, priority);
 
-    // Increment sequence number for new transaction
-    ++this->m_seqNum;
-
     // Capture info for history
-    txn->m_history->seq_num = this->m_seqNum;
+    txn->m_history->seq_num = this->nextSequence();
     txn->m_history->src_eid = m_manager->getLocalEidParam();
     txn->m_history->peer_eid = dest_id;
 
