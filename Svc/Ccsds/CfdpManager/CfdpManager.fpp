@@ -13,6 +13,7 @@ module Cfdp {
         include "Events.fppi"
         include "Parameters.fppi"
         include "Telemetry.fppi"
+        include "DequeueCommands.fppi"
 
         ##############################################################################
         # Custom ports
