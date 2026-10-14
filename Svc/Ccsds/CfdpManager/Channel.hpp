@@ -336,6 +336,10 @@ class Channel {
      */
     void moveTransaction(Transaction* txn, QueueId::T queue);
 
+    void reportQueueDepths();
+
+    U16 countQueue(QueueId::T queue) const;
+
     /**
      * @brief Frees and resets a transaction and returns it for later use
      *

@@ -534,6 +534,8 @@ class CfdpManagerTester final : public CfdpManagerGTestBase {
     void testDisableLetsTheActiveTransferFinish();
     void testResetCountersKeepsQueueDepths();
     void testPrmSetChangesNoSlotAndNoState();
+    void testQueueDepthsFollowTheQueues();
+    ChannelTelemetry lastChannelTelemetry();
 
     ChannelArrayParams channels(Fw::Enabled dequeue, U32 pdusPerCycle);
     PollArrayParams polling(U8 channel, const char* srcDir, U32 interval);

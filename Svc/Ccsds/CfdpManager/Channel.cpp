@@ -501,100 +501,36 @@ void Channel::resetHistory(History* history) {
 void Channel::dequeueTransaction(Transaction* txn) {
     FW_ASSERT(txn);
     CfdpCListRemove(&m_qs[txn->m_flags.com.q_index], &txn->m_cl_node);
-
-    // Update queue depth telemetry
-    Cfdp::ChannelTelemetry& tlm = m_engine->getChannelTelemetryRef(m_channelId);
-    switch (txn->m_flags.com.q_index) {
-        case Cfdp::QueueId::FREE:
-
-            tlm.set_queueFree(static_cast<U16>(tlm.get_queueFree() - 1));
-            break;
-        case Cfdp::QueueId::TXA:
-
-            tlm.set_queueTxActive(static_cast<U16>(tlm.get_queueTxActive() - 1));
-            break;
-        case Cfdp::QueueId::TXW:
-
-            tlm.set_queueTxWaiting(static_cast<U16>(tlm.get_queueTxWaiting() - 1));
-            break;
-        case Cfdp::QueueId::RX:
-
-            tlm.set_queueRx(static_cast<U16>(tlm.get_queueRx() - 1));
-            break;
-        case Cfdp::QueueId::HIST:
-
-            tlm.set_queueHistory(static_cast<U16>(tlm.get_queueHistory() - 1));
-            break;
-        case Cfdp::QueueId::PEND:
-        case Cfdp::QueueId::HIST_FREE:
-            // PEND and HIST_FREE queues are not tracked in telemetry
-            break;
-        default:
-            FW_ASSERT(0, txn->m_flags.com.q_index);
-    }
 }
 
 void Channel::moveTransaction(Transaction* txn, QueueId::T queue) {
     FW_ASSERT(txn);
-    Cfdp::ChannelTelemetry& tlm = m_engine->getChannelTelemetryRef(m_channelId);
-
-    // Decrement old queue
     CfdpCListRemove(&m_qs[txn->m_flags.com.q_index], &txn->m_cl_node);
-    switch (txn->m_flags.com.q_index) {
-        case Cfdp::QueueId::FREE:
-
-            tlm.set_queueFree(static_cast<U16>(tlm.get_queueFree() - 1));
-            break;
-        case Cfdp::QueueId::TXA:
-
-            tlm.set_queueTxActive(static_cast<U16>(tlm.get_queueTxActive() - 1));
-            break;
-        case Cfdp::QueueId::TXW:
-
-            tlm.set_queueTxWaiting(static_cast<U16>(tlm.get_queueTxWaiting() - 1));
-            break;
-        case Cfdp::QueueId::RX:
-
-            tlm.set_queueRx(static_cast<U16>(tlm.get_queueRx() - 1));
-            break;
-        case Cfdp::QueueId::HIST:
-
-            tlm.set_queueHistory(static_cast<U16>(tlm.get_queueHistory() - 1));
-            break;
-        case Cfdp::QueueId::PEND:
-        case Cfdp::QueueId::HIST_FREE:
-            // PEND and HIST_FREE queues are not tracked in telemetry
-            break;
-        default:
-            FW_ASSERT(0, txn->m_flags.com.q_index);
-    }
-
-    // Increment new queue
     CfdpCListInsertBack(&m_qs[queue], &txn->m_cl_node);
     txn->m_flags.com.q_index = queue;
-    switch (queue) {
-        case Cfdp::QueueId::FREE:
-            tlm.set_queueFree(static_cast<U16>(tlm.get_queueFree() + 1));
-            break;
-        case Cfdp::QueueId::TXA:
-            tlm.set_queueTxActive(static_cast<U16>(tlm.get_queueTxActive() + 1));
-            break;
-        case Cfdp::QueueId::TXW:
-            tlm.set_queueTxWaiting(static_cast<U16>(tlm.get_queueTxWaiting() + 1));
-            break;
-        case Cfdp::QueueId::RX:
-            tlm.set_queueRx(static_cast<U16>(tlm.get_queueRx() + 1));
-            break;
-        case Cfdp::QueueId::HIST:
-            tlm.set_queueHistory(static_cast<U16>(tlm.get_queueHistory() + 1));
-            break;
-        case Cfdp::QueueId::PEND:
-        case Cfdp::QueueId::HIST_FREE:
-            // PEND and HIST_FREE queues are not tracked in telemetry
-            break;
-        default:
-            FW_ASSERT(0, queue);
+}
+
+U16 Channel::countQueue(QueueId::T queue) const {
+    constexpr U32 MaxQueueLength = CFDP_NUM_TRANSACTIONS_PER_CHANNEL + NumHistoriesPerChannel;
+    const CListNode* const start = m_qs[queue];
+    U32 count = 0;
+    if (start != nullptr) {
+        const CListNode* node = start;
+        do {
+            ++count;
+            node = node->next;
+        } while ((node != start) && (count < MaxQueueLength));
     }
+    return static_cast<U16>(count);
+}
+
+void Channel::reportQueueDepths() {
+    Cfdp::ChannelTelemetry& tlm = m_engine->getChannelTelemetryRef(m_channelId);
+    tlm.set_queueFree(this->countQueue(QueueId::FREE));
+    tlm.set_queueTxActive(this->countQueue(QueueId::TXA));
+    tlm.set_queueTxWaiting(this->countQueue(QueueId::TXW));
+    tlm.set_queueRx(this->countQueue(QueueId::RX));
+    tlm.set_queueHistory(this->countQueue(QueueId::HIST));
 }
 
 void Channel::freeTransaction(Transaction* txn) {

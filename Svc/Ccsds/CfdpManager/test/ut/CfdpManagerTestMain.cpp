@@ -762,6 +762,11 @@ TEST(Downlink, PollConfigSkipsAnUnwiredChannel) {
     tester.testPollConfigSkipsAnUnwiredChannel();
 }
 
+TEST(Downlink, QueueDepthsFollowTheQueues) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testQueueDepthsFollowTheQueues();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

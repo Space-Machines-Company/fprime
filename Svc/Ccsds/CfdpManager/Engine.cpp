@@ -1046,6 +1046,8 @@ void Engine::cycle(void) {
             chan->processPlaybackDirectories();
             chan->processPollingDirectories();
         }
+
+        chan->reportQueueDepths();
     }
 }
 

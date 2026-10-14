@@ -213,6 +213,49 @@ void CfdpManagerTester::testPrmSetChangesNoSlotAndNoState() {
     (void)Os::FileSystem::removeFile(path(dir, "late.bin").toChar());
 }
 
+ChannelTelemetry CfdpManagerTester::lastChannelTelemetry() {
+    this->cycles(1);
+    return this->tlmHistory_ChannelTelemetry->at(this->tlmHistory_ChannelTelemetry->size() - 1).arg[0];
+}
+
+void CfdpManagerTester::testQueueDepthsFollowTheQueues() {
+    const char* dir = "test/ut/output/queue_depths";
+    const EntityId local = this->component.getLocalEidParam();
+    this->putFile(dir, "out.bin", 512);
+    this->boot(PollArrayParams(), Fw::Enabled::ENABLED, ROOMY);
+    const U16 free = this->lastChannelTelemetry().get_queueFree();
+    ASSERT_GT(free, 0U);
+
+    this->sendMetadataPdu(0, TEST_GROUND_EID, local, 77, 4096, "/ground/in.bin", "test/ut/output/queue_in.bin",
+                          Class::CLASS_2, 0);
+    this->component.doDispatch();
+    ChannelTelemetry seen = this->lastChannelTelemetry();
+    ASSERT_EQ(1U, seen.get_queueRx());
+    ASSERT_EQ(free - 1U, seen.get_queueFree());
+
+    this->sendCmd_AbandonTransaction(0, 0, 0, 77, TEST_GROUND_EID);
+    this->component.doDispatch();
+    this->cycles(INACTIVITY + 5);
+    seen = this->lastChannelTelemetry();
+    ASSERT_EQ(0U, seen.get_queueRx());
+    ASSERT_EQ(free, seen.get_queueFree());
+
+    this->sendCmd_SendFile(0, 0, 0, GROUND, Class::CLASS_2, Keep::KEEP, 0, path(dir, "out.bin"),
+                           Fw::String("/downlink/out.bin"));
+    this->component.doDispatch();
+    this->cycles(3);
+    seen = this->lastChannelTelemetry();
+    ASSERT_EQ(0U, seen.get_queueTxActive());
+    ASSERT_EQ(1U, seen.get_queueTxWaiting());
+
+    this->sendCmd_AbandonTransaction(0, 0, 0, 1, local);
+    this->component.doDispatch();
+    this->cycles(INACTIVITY + 5);
+    seen = this->lastChannelTelemetry();
+    ASSERT_EQ(0U, seen.get_queueTxWaiting());
+    ASSERT_EQ(free, seen.get_queueFree());
+}
+
 }  // namespace Cfdp
 }  // namespace Ccsds
 }  // namespace Svc

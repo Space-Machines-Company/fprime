@@ -683,6 +683,9 @@ Telemetry is emitted as the `ChannelTelemetry` array, one `ChannelTelemetry` str
 | faultTxEofError | U32 | Number of EOF PDUs sent with error condition code (other than cancel) |
 
 #### Queue Depths
+
+Each channel counts its queues at the end of every engine cycle, so the depths match the queues whatever path moved a transaction.
+
 | Field | Type | Description |
 |---|---|---|
 | queueFree | U16 | Number of transactions in FREE queue (available for allocation) |
