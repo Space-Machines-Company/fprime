@@ -406,6 +406,18 @@ class CfdpManager final : public CfdpManagerComponentBase {
                                   U8 channelId          //!< Channel ID to reset (0xFF for all channels)
                                   ) override;
 
+    void EnableDequeue_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 channelId) override;
+
+    void DisableDequeue_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 channelId) override;
+
+    void parametersLoaded() override;
+
+    void armPollConfig();
+
+    void setDequeue(U8 channelId, DequeueState::T state);
+
+    void resetChannelCounters(U8 channelId);
+
   private:
     // ----------------------------------------------------------------------
     // Private command helper functions
@@ -492,11 +504,7 @@ class CfdpManager final : public CfdpManagerComponentBase {
     //! \return Inactivity timeout value in seconds
     U32 getInactivityTimerParam(U8 channelIndex);
 
-    //! Get the dequeue enabled parameter for a channel
-    //!
-    //! \param channelIndex [in] Index of the channel
-    //! \return Whether the channel is enabled for dequeuing transactions
-    Fw::Enabled getDequeueEnabledParam(U8 channelIndex);
+    bool dequeueEnabled(U8 channelIndex) const;
 
     //! Get the move directory parameter for a channel
     //!
@@ -539,6 +547,8 @@ class CfdpManager final : public CfdpManagerComponentBase {
 
     //! Telemetry array for all CFDP channels
     Cfdp::ChannelTelemetryArray m_channelTelemetry;
+
+    Cfdp::DequeueTlmArray m_dequeue;
 
     //! Stored for cleanup
     FwEnumStoreType m_allocatorId = 0;

@@ -65,3 +65,6 @@ param ChannelConfig: Cfdp.ChannelArrayParams \
 @ File keeping the next transaction sequence number across restarts; empty keeps none
 param SequenceFile: string size Cfdp.MaxFilePathSize \
     default ""
+
+@ Polling directories armed at boot; a PRM_SET takes effect at the next boot
+param PollConfig: Cfdp.PollArrayParams

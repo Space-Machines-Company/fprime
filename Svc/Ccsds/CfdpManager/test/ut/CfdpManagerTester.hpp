@@ -42,6 +42,8 @@ class CfdpManagerTester final : public CfdpManagerGTestBase {
     //! Construct object CfdpManagerTester
     CfdpManagerTester();
 
+    explicit CfdpManagerTester(FwIndexType unwiredChannel);
+
     //! Destroy object CfdpManagerTester
     ~CfdpManagerTester();
 
@@ -521,6 +523,24 @@ class CfdpManagerTester final : public CfdpManagerGTestBase {
 
     //! Point the SequenceFile parameter at a path
     void useSequenceFile(const char* path);
+
+  public:
+    void testBootPollSendsWithNoCommand();
+    void testDefaultPollConfigPollsNothing();
+    void testPollConfigRefusesAZeroInterval();
+    void testPollConfigSkipsAnUnwiredChannel();
+    void testDequeueStateFollowsBootAndCommands();
+    void testDisabledDequeueHoldsAPolledFile();
+    void testDisableLetsTheActiveTransferFinish();
+    void testResetCountersKeepsQueueDepths();
+    void testPrmSetChangesNoSlotAndNoState();
+
+    ChannelArrayParams channels(Fw::Enabled dequeue, U32 pdusPerCycle);
+    PollArrayParams polling(U8 channel, const char* srcDir, U32 interval);
+    void boot(const PollArrayParams& polls, Fw::Enabled dequeue, U32 pdusPerCycle);
+    void cycles(U32 count);
+    void putFile(const char* dir, const char* name, FwSizeType size);
+    void connectPortsExcept(FwIndexType unwired);
 
   public:
     // ----------------------------------------------------------------------

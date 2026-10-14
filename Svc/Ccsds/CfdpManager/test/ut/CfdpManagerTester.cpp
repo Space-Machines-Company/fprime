@@ -33,10 +33,48 @@ CfdpManagerTester ::CfdpManagerTester()
       m_failBufferAllocation(false) {
     this->connectPorts();
     this->initComponents();
-    this->component.loadParameters();
-
-    // Configure CFDP engine after parameters are loaded
     this->component.configure(this->m_allocator, 10);
+    this->component.loadParameters();
+}
+
+CfdpManagerTester ::CfdpManagerTester(FwIndexType unwiredChannel)
+    : CfdpManagerGTestBase("CfdpManagerTester", MAX_HISTORY_SIZE),
+      component("CfdpManager"),
+      m_pduCopyCount(0),
+      m_failBufferAllocation(false) {
+    this->connectPortsExcept(unwiredChannel);
+    this->initComponents();
+    this->component.configure(this->m_allocator, 10);
+    this->component.loadParameters();
+}
+
+void CfdpManagerTester ::connectPortsExcept(FwIndexType unwired) {
+    this->connect_to_cmdIn(0, this->component.get_cmdIn_InputPort(0));
+    this->component.set_cmdRegOut_OutputPort(0, this->get_from_cmdRegOut(0));
+    this->component.set_cmdResponseOut_OutputPort(0, this->get_from_cmdResponseOut(0));
+    this->component.set_logOut_OutputPort(0, this->get_from_logOut(0));
+#if FW_ENABLE_TEXT_LOGGING == 1
+    this->component.set_logTextOut_OutputPort(0, this->get_from_logTextOut(0));
+#endif
+    this->component.set_prmGetOut_OutputPort(0, this->get_from_prmGetOut(0));
+    this->component.set_prmSetOut_OutputPort(0, this->get_from_prmSetOut(0));
+    this->component.set_timeCaller_OutputPort(0, this->get_from_timeCaller(0));
+    this->component.set_tlmOut_OutputPort(0, this->get_from_tlmOut(0));
+    for (FwIndexType i = 0; i < Cfdp::NumChannels; i++) {
+        this->connect_to_dataIn(i, this->component.get_dataIn_InputPort(i));
+        this->connect_to_dataReturnIn(i, this->component.get_dataReturnIn_InputPort(i));
+        this->component.set_bufferAllocate_OutputPort(i, this->get_from_bufferAllocate(i));
+        this->component.set_bufferDeallocate_OutputPort(i, this->get_from_bufferDeallocate(i));
+        this->component.set_dataInReturn_OutputPort(i, this->get_from_dataInReturn(i));
+        if (i != unwired) {
+            this->component.set_dataOut_OutputPort(i, this->get_from_dataOut(i));
+        }
+    }
+    this->connect_to_fileIn(0, this->component.get_fileIn_InputPort(0));
+    this->connect_to_pingIn(0, this->component.get_pingIn_InputPort(0));
+    this->connect_to_run1Hz(0, this->component.get_run1Hz_InputPort(0));
+    this->component.set_fileDoneOut_OutputPort(0, this->get_from_fileDoneOut(0));
+    this->component.set_pingOut_OutputPort(0, this->get_from_pingOut(0));
 }
 
 CfdpManagerTester ::~CfdpManagerTester() {

@@ -613,3 +613,25 @@ event SequenceFileUnavailable(
 ) \
     severity warning low \
     format "Cannot keep transaction numbers in {}; starting from a random value"
+
+@ A channel's pending transactions are made active again
+event DequeueEnabled(
+    channelId: U8 @< Channel ID
+) \
+    severity activity low \
+    format "Channel {} dequeue enabled"
+
+@ A channel's pending transactions wait
+event DequeueDisabled(
+    channelId: U8 @< Channel ID
+) \
+    severity activity low \
+    format "Channel {} dequeue disabled"
+
+@ A PollConfig entry names a channel whose dataOut is not connected
+event PollDirUnwired(
+    channelId: U8 @< Channel ID
+    pollId: U8 @< Poll index
+) \
+    severity warning low \
+    format "Channel {} poll {} not armed: the channel's dataOut is not connected"

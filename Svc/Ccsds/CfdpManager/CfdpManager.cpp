@@ -88,6 +88,7 @@ void CfdpManager ::run1Hz_handler(FwIndexType portNum, U32 context) {
 
     // Emit telemetry once per second
     this->tlmWrite_ChannelTelemetry(this->m_channelTelemetry);
+    this->tlmWrite_Dequeue(this->m_dequeue);
 }
 
 void CfdpManager ::drainFileInQueue() {
@@ -524,13 +525,13 @@ void CfdpManager ::ResetCounters_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 
     // 0xFF means reset all channels
     if (channelId == 0xFF) {
         for (U8 i = 0; i < Cfdp::NumChannels; i++) {
-            this->m_channelTelemetry[i] = Cfdp::ChannelTelemetry();
+            this->resetChannelCounters(i);
         }
         this->log_ACTIVITY_HI_ResetCounters(0xFF);
     }
     // Otherwise reset specific channel
     else if (channelId < Cfdp::NumChannels) {
-        this->m_channelTelemetry[channelId] = Cfdp::ChannelTelemetry();
+        this->resetChannelCounters(channelId);
         this->log_ACTIVITY_HI_ResetCounters(channelId);
     } else {
         // Invalid channel ID
@@ -543,6 +544,82 @@ void CfdpManager ::ResetCounters_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 
     this->tlmWrite_ChannelTelemetry(this->m_channelTelemetry);
 
     this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
+void CfdpManager ::EnableDequeue_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 channelId) {
+    const Fw::CmdResponse::T status = this->checkCommandChannelIndex(channelId);
+    if (status == Fw::CmdResponse::OK) {
+        this->setDequeue(channelId, DequeueState::ENABLED);
+        this->log_ACTIVITY_LO_DequeueEnabled(channelId);
+    }
+    this->cmdResponse_out(opCode, cmdSeq, status);
+}
+
+void CfdpManager ::DisableDequeue_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U8 channelId) {
+    const Fw::CmdResponse::T status = this->checkCommandChannelIndex(channelId);
+    if (status == Fw::CmdResponse::OK) {
+        this->setDequeue(channelId, DequeueState::DISABLED_BY_COMMAND);
+        this->log_ACTIVITY_LO_DequeueDisabled(channelId);
+    }
+    this->cmdResponse_out(opCode, cmdSeq, status);
+}
+
+void CfdpManager ::setDequeue(U8 channelId, DequeueState::T state) {
+    const U16 commands = static_cast<U16>(this->m_dequeue[channelId].get_commands() + 1);
+    this->m_dequeue[channelId] = DequeueTlm(state, commands);
+    this->tlmWrite_Dequeue(this->m_dequeue);
+}
+
+void CfdpManager ::resetChannelCounters(U8 channelId) {
+    const ChannelTelemetry kept = this->m_channelTelemetry[channelId];
+    ChannelTelemetry reset;
+    reset.set_queueFree(kept.get_queueFree());
+    reset.set_queueTxActive(kept.get_queueTxActive());
+    reset.set_queueTxWaiting(kept.get_queueTxWaiting());
+    reset.set_queueRx(kept.get_queueRx());
+    reset.set_queueHistory(kept.get_queueHistory());
+    this->m_channelTelemetry[channelId] = reset;
+}
+
+void CfdpManager ::parametersLoaded() {
+    Fw::ParamValid valid;
+    const ChannelArrayParams channels = this->paramGet_ChannelConfig(valid);
+    FW_ASSERT(FW_PARAM_OK(valid), static_cast<FwAssertArgType>(valid.e));
+    for (U8 channel = 0; channel < Cfdp::NumChannels; channel++) {
+        const DequeueState::T state = (channels[channel].get_dequeue_enabled() == Fw::Enabled::ENABLED)
+                                          ? DequeueState::ENABLED
+                                          : DequeueState::DISABLED_AT_BOOT;
+        this->m_dequeue[channel] = DequeueTlm(state, 0);
+    }
+    this->armPollConfig();
+}
+
+void CfdpManager ::armPollConfig() {
+    FW_ASSERT(this->m_engine != nullptr);
+    Fw::ParamValid valid;
+    const PollArrayParams config = this->paramGet_PollConfig(valid);
+    for (U8 channel = 0; channel < Cfdp::NumChannels; channel++) {
+        for (U8 poll = 0; poll < MaxPollingDirPerChan; poll++) {
+            const PollParams& entry = config[channel][poll];
+            if (entry.get_enabled() != Fw::Enabled::ENABLED) {
+                continue;
+            }
+            if (this->checkCommandPollInterval(entry.get_interval()) != Fw::CmdResponse::OK) {
+                continue;
+            }
+            if (!this->isConnected_dataOut_OutputPort(channel)) {
+                this->log_WARNING_LO_PollDirUnwired(channel, poll);
+                continue;
+            }
+            const Fw::String source(entry.get_srcDir());
+            const Fw::String destination(entry.get_dstDir());
+            if (this->m_engine->startPollDir(channel, poll, source, destination, entry.get_cfdpClass(),
+                                             entry.get_priority(), entry.get_destEid(),
+                                             entry.get_interval()) == Status::SUCCESS) {
+                this->log_ACTIVITY_LO_PollDirInitiated(source, poll);
+            }
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -711,18 +788,9 @@ U32 CfdpManager::getInactivityTimerParam(U8 channelIndex) {
     return paramArray[channelIndex].get_inactivity_timer();
 }
 
-Fw::Enabled CfdpManager::getDequeueEnabledParam(U8 channelIndex) {
-    Fw::ParamValid valid;
-
+bool CfdpManager ::dequeueEnabled(U8 channelIndex) const {
     FW_ASSERT(channelIndex < Cfdp::NumChannels, channelIndex, Cfdp::NumChannels);
-
-    // Check for coding errors as all CFDP parameters must have a default
-    // Get the array first
-    ChannelArrayParams paramArray = paramGet_ChannelConfig(valid);
-    FW_ASSERT(FW_PARAM_OK(valid), static_cast<FwAssertArgType>(valid.e));
-
-    // Now get individual parameter
-    return paramArray[channelIndex].get_dequeue_enabled();
+    return this->m_dequeue[channelIndex].get_state() == DequeueState::ENABLED;
 }
 
 Fw::String CfdpManager::getMoveDirParam(U8 channelIndex) {

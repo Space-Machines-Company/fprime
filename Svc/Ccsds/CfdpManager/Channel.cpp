@@ -214,56 +214,54 @@ void Channel::cycleTx() {
     Transaction* txn;
     CycleTxArgs args;
 
-    if (m_cfdpManager->getDequeueEnabledParam(m_channelId)) {
-        args.chan = this;
-        args.ran_one = 0;
+    args.chan = this;
+    args.ran_one = 0;
 
-        // loop through as long as there are pending transactions, and a message buffer to send their PDUs on
+    // loop through as long as there are pending transactions, and a message buffer to send their PDUs on
 
-        // NOTE: tick processing is higher priority than sending new filedata PDUs, so only send however many
-        // PDUs that can be sent once we get to here
-        if (!this->m_currentTxn) {  // don't enter if currentTxn is set, since we need to pick up where we left off on
-                                    // tick processing next scheduler cycle
+    // NOTE: tick processing is higher priority than sending new filedata PDUs, so only send however many
+    // PDUs that can be sent once we get to here
+    if (!this->m_currentTxn) {  // don't enter if currentTxn is set, since we need to pick up where we left off on
+                                // tick processing next scheduler cycle
 
-            // Process pending transactions until queue is empty or something runs
-            while (true) {
-                // Context for static wrapper: pass both Channel* and CycleTxArgs*
-                struct CycleTxContext {
-                    Channel* channel;
-                    CycleTxArgs* args;
-                } cycleTxCtx = {this, &args};
+        // Process pending transactions until queue is empty or something runs
+        while (true) {
+            // Context for static wrapper: pass both Channel* and CycleTxArgs*
+            struct CycleTxContext {
+                Channel* channel;
+                CycleTxArgs* args;
+            } cycleTxCtx = {this, &args};
 
-                // Attempt to run something on TXA
-                CfdpCListTraverse(m_qs[QueueId::TXA], &Channel::cycleTxFirstActiveWrapper, &cycleTxCtx);
+            // Attempt to run something on TXA
+            CfdpCListTraverse(m_qs[QueueId::TXA], &Channel::cycleTxFirstActiveWrapper, &cycleTxCtx);
 
-                // Keep going until QueueId::PEND is empty or something is run
-                if (args.ran_one || m_qs[QueueId::PEND] == nullptr) {
+            // Keep going until QueueId::PEND is empty or something is run
+            if (args.ran_one || m_qs[QueueId::PEND] == nullptr || !m_cfdpManager->dequeueEnabled(m_channelId)) {
+                break;
+            }
+
+            txn = container_of_cpp(m_qs[QueueId::PEND], &Transaction::m_cl_node);
+
+            // Class 2 transactions need a chunklist for NAK processing, get one now.
+            // Class 1 transactions don't need chunks since they don't support NAKs.
+            if (txn->getClass() == Cfdp::Class::CLASS_2) {
+                if (txn->m_chunks == nullptr) {
+                    txn->m_chunks = this->findUnusedChunks(Direction::DIRECTION_TX);
+                }
+                if (txn->m_chunks == nullptr) {
+                    // Chunklist unavailable - EVR already emitted by Engine
+                    // Leave transaction pending until a chunklist is available.
                     break;
                 }
-
-                txn = container_of_cpp(m_qs[QueueId::PEND], &Transaction::m_cl_node);
-
-                // Class 2 transactions need a chunklist for NAK processing, get one now.
-                // Class 1 transactions don't need chunks since they don't support NAKs.
-                if (txn->getClass() == Cfdp::Class::CLASS_2) {
-                    if (txn->m_chunks == nullptr) {
-                        txn->m_chunks = this->findUnusedChunks(Direction::DIRECTION_TX);
-                    }
-                    if (txn->m_chunks == nullptr) {
-                        // Chunklist unavailable - EVR already emitted by Engine
-                        // Leave transaction pending until a chunklist is available.
-                        break;
-                    }
-                }
-
-                m_engine->armInactTimer(txn);
-                this->moveTransaction(txn, QueueId::TXA);
             }
-        }
 
-        // in case the loop exited due to no message buffers, clear it and start from the top next time
-        this->m_currentTxn = nullptr;
+            m_engine->armInactTimer(txn);
+            this->moveTransaction(txn, QueueId::TXA);
+        }
     }
+
+    // in case the loop exited due to no message buffers, clear it and start from the top next time
+    this->m_currentTxn = nullptr;
 }
 
 void Channel::tickTransactions() {

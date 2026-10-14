@@ -236,6 +236,12 @@ Each polling slot owns an interval timer that is evaluated once per `run1Hz` cyc
 
 Polling continues until stopped with the `StopPollDirectory` command. Stopping is only honored for a slot that is currently enabled; stopping an inactive slot produces a `PollDirNotActive` event.
 
+**Polling from boot:** the `PollConfig` parameter holds every channel's polling slots (`MaxPollingDirPerChan` per channel). `parametersLoaded()` arms each `ENABLED` entry as `PollDirectory` would, after the same interval check; it skips, with a `PollDirUnwired` event, an entry on a channel whose `dataOut` port is not connected. A missing or unreadable `PollConfig` arms nothing. A `PRM_SET` of `PollConfig` takes effect at the next boot. One encoded `PollConfig` record must fit `FW_PARAM_BUFFER_MAX_SIZE`; a larger record stops PrmDb reading the rest of the file.
+
+### Dequeue
+
+Each channel has a runtime dequeue state, `DISABLED_AT_BOOT`, `ENABLED` or `DISABLED_BY_COMMAND`. `parametersLoaded()` sets `ENABLED` or `DISABLED_AT_BOOT` from `ChannelConfig.dequeue_enabled`; `EnableDequeue` and `DisableDequeue` (cFS CF's `ENABLE/DISABLE_DEQUEUE`) change it afterwards. While a channel is not `ENABLED`, `cycleTx` makes no pending transaction active: active transactions run to their end and pending ones wait, with no inactivity timer armed. Every downlink on the channel waits alike: polls, playbacks, `SendFile` and `fileIn` requests. The `Dequeue` telemetry reports each channel's state and the count of Enable and Disable commands it ran since boot.
+
 ## Sequence Diagrams
 
 The following sequence diagrams illustrate the external protocol exchanges between spacecraft and ground systems during CFDP transactions. These diagrams focus on the PDU-level interactions and do not depict the internal state machine transitions or detailed transaction processing logic within the CfdpManager component.
@@ -488,6 +494,9 @@ The CFDP Manager provides comprehensive event reporting covering all aspects of 
 | InvalidPollInterval | warning low | Invalid poll interval requested (must be non-zero) |
 | SetFlowState | activity low | Set channel to specified flow state |
 | ResetCounters | activity high | Reset telemetry counters for channel (0xFF indicates all channels) |
+| DequeueEnabled | activity low | The channel makes pending transactions active again |
+| DequeueDisabled | activity low | The channel holds pending transactions |
+| PollDirUnwired | warning low | A `PollConfig` entry names a channel whose `dataOut` is not connected; the poll is not armed |
 
 ### PDU Serialization/Deserialization Errors
 
@@ -594,7 +603,9 @@ The CFDP Manager provides comprehensive event reporting covering all aspects of 
 | SuspendResumeTransaction | Suspend or resume a transaction. When suspended, the transaction remains in memory but stops making progress (no PDUs sent or processed, no timers tick). Useful during critical spacecraft operations. Takes an action parameter (SUSPEND or RESUME). Transactions are identified by channel ID, transaction sequence number, and entity ID. |
 | CancelTransaction | Gracefully cancel a transaction with protocol close-out. Sends FIN/ACK PDUs as appropriate for the transaction type and state. Transaction is removed from memory. Transactions are identified by channel ID, transaction sequence number, and entity ID. |
 | AbandonTransaction | Immediately terminate a transaction without protocol close-out. No FIN/ACK sent. Transaction is immediately removed from memory. Used for stuck or unresponsive transactions. Transactions are identified by channel ID, transaction sequence number, and entity ID. |
-| ResetCounters | Resets telemetry counters for the specified CFDP channel. Pass `channelId` 0xFF to reset all channels. |
+| ResetCounters | Resets telemetry counters for the specified CFDP channel. Pass `channelId` 0xFF to reset all channels. The queue depths and the dequeue state are kept. |
+| EnableDequeue | Lets the channel make pending transactions active. An invalid channel answers `VALIDATION_ERROR`. |
+| DisableDequeue | Holds the channel's pending transactions; active ones run to their end. An invalid channel answers `VALIDATION_ERROR`. |
 
 ## Parameters
 
@@ -612,11 +623,12 @@ The CFDP Manager provides comprehensive event reporting covering all aspects of 
 | ChannelConfig.nack_limit | Maximum number of NAK retransmission attempts before abandoning a transaction. Applies when waiting for retransmitted file data after sending NAK |
 | ChannelConfig.ack_timer | ACK timeout duration in seconds. Determines how long to wait for ACK(EOF) or ACK(FIN) before retransmitting |
 | ChannelConfig.inactivity_timer | Inactivity timeout duration in seconds. Transaction is abandoned if no PDUs are received within this period |
-| ChannelConfig.dequeue_enabled | Enable or disable transaction dequeuing and processing for this channel. Can be used to pause channel activity |
+| ChannelConfig.dequeue_enabled | Sets the channel's dequeue state at boot (`ENABLED` or `DISABLED_AT_BOOT`); a disabled channel holds pending transactions and lets active ones finish. A `PRM_SET` takes effect at the next boot |
 | ChannelConfig.move_dir | Directory path to move source files after successful TX (transmit) transactions when keep is set to DELETE. If set, provides an archive mechanism to preserve files instead of deleting them. If empty or if the move fails, source files are deleted from the filesystem. Only applies to sending files, not receiving |
 | ChannelConfig.max_outgoing_pdus_per_cycle | Maximum number of outgoing PDUs to transmit per execution cycle. Throttles transmission rate to prevent overwhelming downstream components |
 | ChannelConfig.tmp_dir | Directory path for storing temporary files during receive (RX) transactions. Files are written here during transfer and moved to their final destination upon successful completion |
 | ChannelConfig.fail_dir | Directory path for storing files from polling operations that failed to transfer successfully. If empty or if the move fails, files are deleted from the filesystem |
+| PollConfig | Each channel's polling slots armed at boot: `enabled`, `interval` (seconds, non-zero), `priority`, `cfdpClass`, `destEid`, `srcDir`, `dstDir`. Default: every slot `DISABLED`. A `PRM_SET` takes effect at the next boot |
 
 ### Deep Space Timer Configuration
 
@@ -684,6 +696,13 @@ Telemetry is emitted as the `ChannelTelemetry` array, one `ChannelTelemetry` str
 |---|---|---|
 | playbackCounter | U8 | Number of active directory playback operations |
 | pollCounter | U8 | Number of active directory poll operations |
+
+The `Dequeue` telemetry is one `DequeueTlm` per channel:
+
+| Field | Type | Description |
+|---|---|---|
+| state | DequeueState | `DISABLED_AT_BOOT`, `ENABLED` or `DISABLED_BY_COMMAND` |
+| commands | U16 | Enable and Disable commands the channel ran since boot |
 
 ## Requirements
 

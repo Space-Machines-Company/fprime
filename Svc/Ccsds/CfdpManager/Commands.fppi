@@ -70,3 +70,13 @@ async command AbandonTransaction(
 async command ResetCounters(
     channelId: U8 @< Channel ID to reset (0xFF for all channels)
 )
+
+@ Let a channel make pending transactions active
+async command EnableDequeue(
+    channelId: U8 @< Channel ID
+)
+
+@ Hold a channel's pending transactions; active ones run to their end
+async command DisableDequeue(
+    channelId: U8 @< Channel ID
+)

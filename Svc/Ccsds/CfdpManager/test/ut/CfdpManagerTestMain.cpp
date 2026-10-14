@@ -717,6 +717,51 @@ TEST(Coverage, PrioritySearchCallback) {
     tester.testPrioritySearchCallback();
 }
 
+TEST(Downlink, BootPollSendsWithNoCommand) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testBootPollSendsWithNoCommand();
+}
+
+TEST(Downlink, DefaultPollConfigPollsNothing) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testDefaultPollConfigPollsNothing();
+}
+
+TEST(Downlink, PollConfigRefusesAZeroInterval) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testPollConfigRefusesAZeroInterval();
+}
+
+TEST(Downlink, DequeueStateFollowsBootAndCommands) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testDequeueStateFollowsBootAndCommands();
+}
+
+TEST(Downlink, DisabledDequeueHoldsAPolledFile) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testDisabledDequeueHoldsAPolledFile();
+}
+
+TEST(Downlink, DisableLetsTheActiveTransferFinish) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testDisableLetsTheActiveTransferFinish();
+}
+
+TEST(Downlink, ResetCountersKeepsQueueDepths) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testResetCountersKeepsQueueDepths();
+}
+
+TEST(Downlink, PrmSetChangesNoSlotAndNoState) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester;
+    tester.testPrmSetChangesNoSlotAndNoState();
+}
+
+TEST(Downlink, PollConfigSkipsAnUnwiredChannel) {
+    Svc::Ccsds::Cfdp::CfdpManagerTester tester(1);
+    tester.testPollConfigSkipsAnUnwiredChannel();
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

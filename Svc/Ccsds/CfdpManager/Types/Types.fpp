@@ -130,6 +130,39 @@ module Cfdp {
     @< Structure for the telemetry array of CFDP channels
     array ChannelTelemetryArray = [NumChannels] ChannelTelemetry
 
+    @ Runtime dequeue state of one channel
+    enum DequeueState {
+        DISABLED_AT_BOOT @< ChannelConfig.dequeue_enabled was DISABLED at boot and no command has run since
+        ENABLED @< Pending transactions are made active
+        DISABLED_BY_COMMAND @< DisableDequeue ran; pending transactions wait
+    }
+
+    @ Dequeue state of one channel and the Enable and Disable commands it ran since boot
+    struct DequeueTlm {
+        $state: DequeueState
+        commands: U16
+    }
+
+    @ Dequeue telemetry of every channel
+    array DequeueTlmArray = [NumChannels] DequeueTlm
+
+    @ One polling directory armed at boot
+    struct PollParams {
+        enabled: Fw.Enabled
+        interval: U32
+        $priority: U8
+        cfdpClass: Class
+        destEid: EntityId
+        srcDir: string size MaxFilePathSize
+        dstDir: string size MaxFilePathSize
+    }
+
+    @ The polling directories of one channel
+    array ChannelPollParams = [MaxPollingDirPerChan] PollParams
+
+    @ The polling directories of every channel
+    array PollArrayParams = [NumChannels] ChannelPollParams
+
 }
 }
 }
