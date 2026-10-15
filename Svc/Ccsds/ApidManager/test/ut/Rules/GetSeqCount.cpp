@@ -18,13 +18,13 @@ namespace Ccsds {
 // ----------------------------------------------------------------------
 
 bool ApidManagerTester::GetSeqCount__Existing__precondition() const {
-    return !this->shadow.shadow_seqCounts.empty();
+    return !this->shadow.shadow_downlinkCounts.empty();
 }
 
 void ApidManagerTester::GetSeqCount__Existing__action() {
     this->clearHistory();
 
-    ComCfg::Apid::T apid = this->shadow.shadow_getRandomTrackedApid();
+    ComCfg::Apid::T apid = ApidManagerTestState::shadow_getRandomTrackedApid(this->shadow.shadow_downlinkCounts);
     U16 returned = this->invoke_to_getApidSeqCountIn(0, apid, 0);
     U16 expected = this->shadow.shadow_getAndIncrementSeqCount(apid);
 
@@ -45,7 +45,7 @@ void ApidManagerTester::GetSeqCount__NewOk__action() {
 
     // Use constexpr local to avoid ODR-use of the static constexpr member
     constexpr U16 maxTrackedApids = ApidManager::MAX_TRACKED_APIDS;
-    if (this->shadow.shadow_seqCounts.size() >= maxTrackedApids) {
+    if (this->shadow.shadow_downlinkCounts.size() >= maxTrackedApids) {
         // Table is now full; update shadow flag so the precondition flips
         this->shadow.shadow_isTableFull = true;
         return;

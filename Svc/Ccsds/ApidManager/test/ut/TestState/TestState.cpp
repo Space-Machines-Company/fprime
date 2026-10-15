@@ -20,29 +20,27 @@ namespace Ccsds {
 // ----------------------------------------------------------------------
 
 U16 ApidManagerTestState::shadow_getAndIncrementSeqCount(ComCfg::Apid::T apid) {
-    auto it = this->shadow_seqCounts.find(apid);
-    if (it != this->shadow_seqCounts.end()) {
+    auto it = this->shadow_downlinkCounts.find(apid);
+    if (it != this->shadow_downlinkCounts.end()) {
         // APID already tracked: return current count and advance to the next
         U16 current = it->second;
         it->second = static_cast<U16>((current + 1) % (1 << SpacePacketSubfields::SeqCountWidth));
         return current;
     }
     // APID not yet tracked: register it, starting at count 0
-    this->shadow_seqCounts[apid] = static_cast<U16>(1);  // next expected is 1
-    return 0;                                            // first count returned is 0
+    this->shadow_downlinkCounts[apid] = static_cast<U16>(1);  // next expected is 1
+    return 0;                                                 // first count returned is 0
 }
 
-void ApidManagerTestState::shadow_validateApidSeqCount(ComCfg::Apid::T apid, U16 expectedSeqCount) {
-    auto it = this->shadow_seqCounts.find(apid);
-    if (it != this->shadow_seqCounts.end()) {
-        it->second = static_cast<U16>((expectedSeqCount + 1) % (1 << SpacePacketSubfields::SeqCountWidth));
-    }
+void ApidManagerTestState::shadow_validateApidSeqCount(ComCfg::Apid::T apid, U16 receivedSeqCount) {
+    this->shadow_uplinkCounts[apid] =
+        static_cast<U16>((receivedSeqCount + 1) % (1 << SpacePacketSubfields::SeqCountWidth));
 }
 
-ComCfg::Apid::T ApidManagerTestState::shadow_getRandomTrackedApid() const {
-    FW_ASSERT(!this->shadow_seqCounts.empty());
-    U32 idx = STest::Random::lowerUpper(0, static_cast<U32>(this->shadow_seqCounts.size()) - 1);
-    return std::next(this->shadow_seqCounts.begin(), idx)->first;
+ComCfg::Apid::T ApidManagerTestState::shadow_getRandomTrackedApid(const std::map<ComCfg::Apid::T, U16>& counts) {
+    FW_ASSERT(!counts.empty());
+    U32 idx = STest::Random::lowerUpper(0, static_cast<U32>(counts.size()) - 1);
+    return std::next(counts.begin(), idx)->first;
 }
 
 }  // namespace Ccsds

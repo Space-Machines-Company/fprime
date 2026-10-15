@@ -39,6 +39,10 @@ class ApidManagerTester : public ApidManagerGTestBase {
     //! Destroy object ApidManagerTester
     ~ApidManagerTester();
 
+    //! A downlink count between two uplink checks on one APID raises no event, and an uplink resync leaves the
+    //! downlink count where it was
+    void checkBothDirectionsCountApart();
+
   private:
     // ----------------------------------------------------------------------
     // Helper functions (auto-generated via UT_AUTO_HELPERS)
@@ -73,6 +77,7 @@ class ApidManagerTester : public ApidManagerGTestBase {
     //! Rules for the validateApidSeqCountIn port
     FW_RBT_DEFINE_RULE(ApidManagerTester, ValidateSeqCount, Ok);
     FW_RBT_DEFINE_RULE(ApidManagerTester, ValidateSeqCount, Failure);
+    FW_RBT_DEFINE_RULE(ApidManagerTester, ValidateSeqCount, NewOk);
 };
 
 }  // namespace Ccsds

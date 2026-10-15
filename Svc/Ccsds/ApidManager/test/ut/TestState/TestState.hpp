@@ -34,11 +34,15 @@ class ApidManagerTestState {
     // These state variables mirror the component's internal state (APID map, etc).
     // ----------------------------------------------------------------------
 
-    //! Expected next sequence count for every tracked APID.
-    //! Mirrors the component's m_apidSequences map.
-    std::map<ComCfg::Apid::T, U16> shadow_seqCounts;
+    //! Next sequence count expected on uplink for every APID validated so far.
+    //! Mirrors the component's m_uplinkSequences map.
+    std::map<ComCfg::Apid::T, U16> shadow_uplinkCounts;
 
-    //! True once shadow_seqCounts has reached MAX_TRACKED_APIDS entries.
+    //! Next sequence count to stamp on downlink for every APID requested so far.
+    //! Mirrors the component's m_downlinkSequences map.
+    std::map<ComCfg::Apid::T, U16> shadow_downlinkCounts;
+
+    //! True once shadow_downlinkCounts has reached MAX_TRACKED_APIDS entries.
     bool shadow_isTableFull = false;
 
   public:
@@ -47,16 +51,16 @@ class ApidManagerTestState {
     // or simple test helpers querying the state
     // -----------------------------------------------------------------------------
 
-    //! Return the current expected sequence count for apid and advance the
+    //! Return the current downlink sequence count for apid and advance the
     //! shadow to the next value.
     U16 shadow_getAndIncrementSeqCount(ComCfg::Apid::T apid);
 
-    //! Advance the shadow's expected count as if validateApidSeqCountIn was
-    //! called with expectedSeqCount.  Mirrors the component's setNextSeqCount.
-    void shadow_validateApidSeqCount(ComCfg::Apid::T apid, U16 expectedSeqCount);
+    //! Advance the shadow's expected uplink count as if validateApidSeqCountIn was
+    //! called with receivedSeqCount: the next one expected follows it.
+    void shadow_validateApidSeqCount(ComCfg::Apid::T apid, U16 receivedSeqCount);
 
-    //! Return a uniformly random APID from the set currently tracked in the shadow.
-    ComCfg::Apid::T shadow_getRandomTrackedApid() const;
+    //! Return a uniformly random APID from those the shadow tracks in counts.
+    static ComCfg::Apid::T shadow_getRandomTrackedApid(const std::map<ComCfg::Apid::T, U16>& counts);
 };
 
 }  // namespace Ccsds

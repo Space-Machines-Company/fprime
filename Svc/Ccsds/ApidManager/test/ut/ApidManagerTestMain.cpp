@@ -29,7 +29,7 @@ TEST(ApidManager, GetSequenceCounts) {
 // and fires UnexpectedSequenceCount on a mismatch.
 TEST(ApidManager, ValidateSequenceCounts) {
     ApidManagerTester tester;
-    ApidManagerTester::GetSeqCount__NewOk ruleNewOk;
+    ApidManagerTester::ValidateSeqCount__NewOk ruleNewOk;
     ApidManagerTester::ValidateSeqCount__Ok ruleValidateOk;
     ApidManagerTester::ValidateSeqCount__Failure ruleValidateFailure;
     ruleNewOk.apply(tester);            // register an APID so validate rules can fire
@@ -38,6 +38,11 @@ TEST(ApidManager, ValidateSequenceCounts) {
 }
 
 // Randomized test: apply rules in a random sequence for a large number of iterations
+TEST(ApidManager, DownlinkCountsLeaveUplinkChecksAlone) {
+    ApidManagerTester tester;
+    tester.checkBothDirectionsCountApart();
+}
+
 TEST(ApidManager, RandomizedTesting) {
     U32 numRulesToApply = 10000;
     ApidManagerTester tester;
@@ -45,12 +50,10 @@ TEST(ApidManager, RandomizedTesting) {
     ApidManagerTester::GetSeqCount__NewOk ruleGetNewOk;
     ApidManagerTester::ValidateSeqCount__Ok ruleValidateOk;
     ApidManagerTester::ValidateSeqCount__Failure ruleValidateFailure;
+    ApidManagerTester::ValidateSeqCount__NewOk ruleValidateNewOk;
 
     STest::Rule<ApidManagerTester>* rules[] = {
-        &ruleGetExisting,
-        &ruleGetNewOk,
-        &ruleValidateOk,
-        &ruleValidateFailure,
+        &ruleGetExisting, &ruleGetNewOk, &ruleValidateOk, &ruleValidateFailure, &ruleValidateNewOk,
     };
 
     STest::RandomScenario<ApidManagerTester> random("Random Rules", rules, FW_NUM_ARRAY_ELEMENTS(rules));

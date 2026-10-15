@@ -64,27 +64,30 @@ class ApidManager final : public ApidManagerComponentBase {
                                   U16 seqCount) override;
 
   private:
-    // ----------------------------------------------------------------------
-    // Helpers
-    // ----------------------------------------------------------------------
-    //! Get the sequence count for a given APID and increment it for the next.
-    //! Wraps around at 14 bits. Asserts if the APID cannot be inserted in the table.
-    U16 getAndIncrementSeqCount(ComCfg::Apid::T apid);
-
-    //! Helper function for wrapping around at 14 bits when calculating the next sequence count
-    U16 calculateNextSeqCount(const U16 seqCount) const;
-
     //! ArrayMap with internal storage
     //! Key: APID
     //! Value: sequence count
     //! Capacity: MAX_TRACKED_APIDS
     using MapType = Fw::ArrayMap<ComCfg::Apid::T, U16, MAX_TRACKED_APIDS>;
 
+    // ----------------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------------
+    //! Get the sequence count for a given APID in counts and increment it for the next.
+    //! Wraps around at 14 bits. Asserts if the APID cannot be inserted in the table.
+    U16 getAndIncrementSeqCount(MapType& counts, ComCfg::Apid::T apid);
+
+    //! Helper function for wrapping around at 14 bits when calculating the next sequence count
+    U16 calculateNextSeqCount(const U16 seqCount) const;
+
   private:
     // ----------------------------------------------------------------------
     // Member variables
     // ----------------------------------------------------------------------
-    MapType m_apidSequences;
+    //! Each direction counts on its own: an APID such as FW_PACKET_FILE carries packets
+    //! both ways, and a packet sent down must not move the count expected from the ground.
+    MapType m_uplinkSequences;    //!< Next sequence count expected on uplink, per APID
+    MapType m_downlinkSequences;  //!< Next sequence count to stamp on downlink, per APID
 };
 
 }  // namespace Ccsds
